@@ -1,0 +1,28 @@
+import org.gradle.api.tasks.Copy
+import org.gradle.api.tasks.TaskProvider
+// Define model URLs and destination paths. This improves readability and maintainability.
+def models = [
+        'mobilenetv1.tflite': 'https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/android/lite-model_ssd_mobilenet_v1_1_metadata_2.tflite',
+        'efficientdet-lite0.tflite': 'https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/android/lite-model_efficientdet_lite0_detection_metadata_1.tflite',
+        'efficientdet-lite1.tflite': 'https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/android/lite-model_efficientdet_lite1_detection_metadata_1.tflite',
+        'efficientdet-lite2.tflite': 'https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/android/lite-model_efficientdet_lite2_detection_metadata_1.tflite'
+]
+// Create a task for each model download.
+models.each { filename, url ->;
+    tasks.register("download${filename.capitalize().replace('.', '')}", Copy) {
+        from {
+            new java.net.URL(url).openStream()
+        }
+        into project.ext.ASSET_DIR
+        rename {String fileName ->; fileName}
+        eachFile { details ->; details.setRelativePath(new File(filename).getAbsolutePath()) } //Important for nested folders
+    }
+}
+// Create the copyTestModel task.  We use TaskProvider to safely access the download tasks.
+TaskProvider<Copy> copyTestModel = tasks.register("copyTestModel", Copy) {
+    dependsOn tasks.named("downloadMobilenetv1Tflite")
+    from project.ext.ASSET_DIR + '/mobilenetv1.tflite'
+    into project.ext.TEST_ASSETS_DIR
+}
+//Depend on all downloads and the copy task.
+preBuild.dependsOn(models.keySet().collect { tasks.named("download${it.capitalize().replace('.', '')}") }, copyTestModel)

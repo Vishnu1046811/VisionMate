@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">VisionMate</string>
+    <string name="action_camera">Open Camera</string>
+    <string name="action_chatbot">Open ChatBot</string>
+</resources>

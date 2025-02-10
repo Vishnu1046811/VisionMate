@@ -1,0 +1,44 @@
+tasks {
+    val downloadModelFile by registering(Download::class) {
+        src = "https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/android/lite-model_ssd_mobilenet_v1_1_metadata_2.tflite"
+        destinationDir = File(project.ext.get("ASSET_DIR") as String)
+        destinationName = "mobilenetv1.tflite"
+        overwrite = false
+    }
+    val downloadModelFile0 by registering(Download::class) {
+        src = "https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/android/lite-model_efficientdet_lite0_detection_metadata_1.tflite"
+        destinationDir = File(project.ext.get("ASSET_DIR") as String)
+        destinationName = "efficientdet-lite0.tflite"
+        overwrite = false
+    }
+
+    val downloadModelFile1 by registering(Download::class) {
+        src = "https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/android/lite-model_efficientdet_lite1_detection_metadata_1.tflite"
+        destinationDir = File(project.ext.get("ASSET_DIR") as String)
+        destinationName = "efficientdet-lite1.tflite"
+        overwrite = false
+    }
+
+    val downloadModelFile2 by registering(Download::class) {
+        src = "https://storage.googleapis.com/download.tensorflow.org/models/tflite/task_library/object_detection/android/lite-model_efficientdet_lite2_detection_metadata_1.tflite"
+        destinationDir = File(project.ext.get("ASSET_DIR") as String)
+        destinationName = "efficientdet-lite2.tflite"
+        overwrite = false
+    }
+
+    val copyTestModel by registering(Copy::class) {
+        dependsOn(downloadModelFile)
+        from = File(project.ext.get("ASSET_DIR") as String, "mobilenetv1.tflite")
+        into = File(project.ext.get("TEST_ASSETS_DIR") as String)
+    }
+
+    preBuild {
+        dependsOn(
+                downloadModelFile,
+                downloadModelFile0,
+                downloadModelFile1,
+                downloadModelFile2,
+                copyTestModel
+        )
+    }
+}
