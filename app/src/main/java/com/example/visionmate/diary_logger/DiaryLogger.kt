@@ -1,5 +1,6 @@
 package com.example.visionmate.diary_logger
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.text.SimpleDateFormat
 import kotlin.coroutines.CoroutineContext
 
 class DiaryLogger(context: Context) : CoroutineScope {
@@ -90,6 +92,7 @@ class DiaryLogger(context: Context) : CoroutineScope {
         return "${calender.get(Calendar.YEAR)}-${calender.get(Calendar.MONTH)+1}-${calender.get(Calendar.DAY_OF_MONTH)}.txt"
     }
 
+    @SuppressLint("SimpleDateFormat")
     private fun saveDescriptionToFile(content: String) {
         val fileName = getFileName()
 
@@ -97,7 +100,11 @@ class DiaryLogger(context: Context) : CoroutineScope {
             folder.mkdirs()
         }
         val file = File(folder, fileName)
-        val logContent = "\n${System.currentTimeMillis()} - $content"
+        val calendar = Calendar.getInstance()
+
+        val sdf = SimpleDateFormat("dd-MM-yyyy-hh-mm-ss a")
+        val formattedDate: String = sdf.format(calendar.time)
+        val logContent = "#${formattedDate}\n$content\n\n"
         FileOutputStream(file, true).use { outputStream ->
             outputStream.write(logContent.toByteArray())
         }
@@ -159,8 +166,9 @@ class DiaryLogger(context: Context) : CoroutineScope {
         launch {
             val file = File(folder, getFileName())
             if (file.exists()) {
+                val date = file.name.replace(".txt","")
                 val fullData = file.readText()
-                val summary = getSummary(fullData)
+                val summary = "$date,\n${getSummary(fullData)}"
                 withContext(Dispatchers.Main) {
                     onSummary(summary)
                 }
@@ -176,7 +184,8 @@ class DiaryLogger(context: Context) : CoroutineScope {
 
     companion object {
         private const val GPT_MODEL = "gpt-4o"
-        private const val TEST = "-" // TODO: Replace it with key
+        // TODO: Replace it with key
+        private const val TEST = ""
         private const val LOG_INTERVAL_SECONDS = 30 // interval between logging images
 
         // COMMANDS

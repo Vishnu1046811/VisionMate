@@ -44,7 +44,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
     private lateinit var cameraExecutor: ExecutorService
     var speechRecognizerWrapper :SpeechRecognizerWrapper?= null
 
-    private var dailyLogger: DiaryLogger? = null
+    private var diaryLogger: DiaryLogger? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         detector = Detector(baseContext, MODEL_PATH, LABELS_PATH, this)
         detector.setup()
 
-        dailyLogger = DiaryLogger(this)
+        diaryLogger = DiaryLogger(this)
 
         if (allPermissionsGranted()) {
             //startCamera()
@@ -72,7 +72,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         //initListener()
 
         binding.btnSummarize.setOnClickListener {
-            dailyLogger?.summarize{
+            diaryLogger?.summarize{
                 if (it != null) {
                     tts?.stop()
                     speakOut(it)
@@ -194,8 +194,8 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
                 bitmapBuffer, 0, 0, bitmapBuffer.width, bitmapBuffer.height,
                 matrix, true
             )
-            // Logging scene to text
-            dailyLogger?.logScene(rotatedBitmap)
+            // Logging scene to text file.
+            diaryLogger?.logScene(rotatedBitmap)
             detector.detect(rotatedBitmap)
         }
 
