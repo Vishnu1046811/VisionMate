@@ -16,15 +16,15 @@ class HomeActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         //startListening()
-
-        PorcupineManager().startListening(this,{ result->
-            Log.e("","")
-            if(result){
-                navigateChatbot()
-            }else{
-                navigateCamera()
-            }
-        })
+        startActivity(Intent(this, MainActivity::class.java))
+//        PorcupineManager().startListening(this,{ result->
+//            Log.e("","")
+//            if(result){
+//                navigateChatbot()
+//            }else{
+//                navigateCamera()
+//            }
+//        })
     }
 /*
 

@@ -1,15 +1,11 @@
 package com.example.visionmate
 
 import android.Manifest
-import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Bundle
-import android.os.Message
 import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.util.Log
@@ -24,20 +20,10 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.applozic.mobicomkit.api.account.register.RegistrationResponse
-import com.applozic.mobicomkit.api.conversation.MessageBuilder
-import com.applozic.mobicomkit.exception.ApplozicException
-import com.applozic.mobicomkit.listners.MediaUploadProgressHandler
-import com.example.visionmate.Constants.APP_ID
 import com.example.visionmate.Constants.LABELS_PATH
 import com.example.visionmate.Constants.MODEL_PATH
 import com.example.visionmate.databinding.ActivityMainBinding
-import io.kommunicate.KmConversationBuilder
-import io.kommunicate.Kommunicate
-import io.kommunicate.callbacks.KMLoginHandler
-import io.kommunicate.callbacks.KmCallback
-import io.kommunicate.users.KMGroupUser
-import io.kommunicate.users.KMUser
+import com.example.visionmate.diary_logger.DiaryLogger
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -58,6 +44,8 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
     private lateinit var cameraExecutor: ExecutorService
     var speechRecognizerWrapper :SpeechRecognizerWrapper?= null
 
+    private var dailyLogger: DiaryLogger? = null
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +60,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         detector = Detector(baseContext, MODEL_PATH, LABELS_PATH, this)
         detector.setup()
 
+        dailyLogger = DiaryLogger(this)
 
         if (allPermissionsGranted()) {
             //startCamera()
@@ -81,6 +70,15 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
 
         cameraExecutor = Executors.newSingleThreadExecutor()
         //initListener()
+
+        binding.btnSummarize.setOnClickListener {
+            dailyLogger?.summarize{
+                if (it != null) {
+                    tts?.stop()
+                    speakOut(it)
+                }
+            }
+        }
 
     }
 
@@ -196,7 +194,8 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
                 bitmapBuffer, 0, 0, bitmapBuffer.width, bitmapBuffer.height,
                 matrix, true
             )
-
+            // Logging scene to text
+            dailyLogger?.logScene(rotatedBitmap)
             detector.detect(rotatedBitmap)
         }
 

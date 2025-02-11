@@ -70,5 +70,10 @@ dependencies {
 
     implementation ("io.kommunicate.sdk:kommunicateui:2.10.0")
     implementation ("ai.picovoice:porcupine-android:3.0.0")
-    implementation("com.google.cloud:google-cloud-speech:2.15.0")
+//    implementation("com.google.cloud:google-cloud-speech:2.15.0")
+
+    //retrofit
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 }
