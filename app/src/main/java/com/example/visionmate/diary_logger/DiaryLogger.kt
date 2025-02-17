@@ -186,7 +186,7 @@ class DiaryLogger(context: Context) : CoroutineScope {
         private const val GPT_MODEL = "gpt-4o"
         // TODO: Replace it with key
         private const val TEST = ""
-        private const val LOG_INTERVAL_SECONDS = 30 // interval between logging images
+        private const val LOG_INTERVAL_SECONDS = 10 // interval between logging images
 
         // COMMANDS
         private const val GPT_COMMAND_TO_ANALYZE_IMAGE = "You are a sighted assistant helping a blind person navigate and understand their surroundings. Your descriptions should be clear, engaging, and natural, similar to how a friend would describe the environment. Focus on important details that help with orientation, safety, and spatial awareness, without overloading with unnecessary information. Ensure all sentences are complete and do not stop mid-thought."

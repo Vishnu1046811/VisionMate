@@ -12,7 +12,7 @@ interface LogDao {
     fun insertLog(logEntry: LogEntry)
 
     @Query("SELECT * FROM logs WHERE id = :id")
-    fun getById(id: Int): LogEntry
+        fun getById(id: Int):LogEntry
 
     @Query("SELECT * FROM logs")
     fun getAllLogs(): List<LogEntry>

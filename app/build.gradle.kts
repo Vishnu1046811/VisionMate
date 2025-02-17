@@ -67,7 +67,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:${cameraxVersion}")
     implementation("androidx.camera:camera-view:${cameraxVersion}")
 
-    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite:2.11.0")
+
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
 
     implementation ("io.kommunicate.sdk:kommunicateui:2.10.0")
@@ -80,9 +81,10 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
 
-    implementation("com.criteo.jfaiss:jfaiss-cpu:1.6.3-9d4999a")
+    implementation("org.apache.opennlp:opennlp-tools:1.9.3")
     //room database
     implementation ("androidx.room:room-runtime:2.6.1")
     implementation ("androidx.room:room-ktx:2.6.1")
-    kapt("androidx.room:room-compiler:2.6.1")
+    kapt("androidx.room:room-compiler:2.5.2")
+
 }

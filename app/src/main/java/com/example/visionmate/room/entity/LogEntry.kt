@@ -7,5 +7,5 @@ import androidx.room.PrimaryKey
 data class LogEntry(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val text: String,  // Actual log content
-    val embedding: String // Store the FAISS vector as a JSON string
+    val tokenized: String // Store the FAISS vector as a JSON string
 )
