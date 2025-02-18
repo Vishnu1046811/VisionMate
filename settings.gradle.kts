@@ -1,5 +1,6 @@
 pluginManagement {
     repositories {
+        google()
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -26,5 +27,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "VisionMate"
-include(":app")
+include(":app",":models")
  
