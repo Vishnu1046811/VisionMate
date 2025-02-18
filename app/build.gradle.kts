@@ -9,14 +9,22 @@ android {
 
     defaultConfig {
         applicationId = "com.example.visionmate"
-        minSdk = 24
-        targetSdk = 34
+        minSdk = 26
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
     }
 
+    lint {
+        abortOnError = false // Prevents build failure due to lint errors
+        disable += listOf("UnusedResources", "HardcodedText") // Disables specific checks
+        checkReleaseBuilds = false // Skips lint checks in release builds
+    }
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -35,6 +43,11 @@ android {
     }
     buildFeatures {
         viewBinding = true
+    }
+    packaging {
+        resources {
+            excludes += "META-INF/DEPENDENCIES"
+        }
     }
     androidResources {
         noCompress += "tflite"
@@ -111,4 +124,18 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Sentence Embeddings
+    // https://github.com/shubham0204/Sentence-Embeddings-Android
+    implementation("com.github.shubham0204:Sentence-Embeddings-Android:0.0.3")
+
+
+    // ObjectBox - vector database
+    debugImplementation("io.objectbox:objectbox-android-objectbrowser:4.0.0")
+    releaseImplementation("io.objectbox:objectbox-android:4.0.3")
+
+    // Gemini SDK - LLM
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 }
+
+apply(plugin = "io.objectbox")

@@ -22,8 +22,12 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.visionmate.Constants.LABELS_PATH
 import com.example.visionmate.Constants.MODEL_PATH
+import com.example.visionmate.chatbot.ChatBotModel
 import com.example.visionmate.databinding.ActivityMainBinding
 import com.example.visionmate.diary_logger.DiaryLogger
+import com.example.visionmate.model.SpeechModel
+import com.google.gson.Gson
+import util.Commands
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -45,6 +49,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
     var speechRecognizerWrapper :SpeechRecognizerWrapper?= null
 
     private var diaryLogger: DiaryLogger? = null
+    private var chatBot: ChatBotModel? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,6 +66,8 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         detector.setup()
 
         diaryLogger = DiaryLogger(this)
+        chatBot = ChatBotModel(this)
+        diaryLogger?.attachChatBot(chatBot)
 
         if (allPermissionsGranted()) {
             //startCamera()
@@ -289,7 +296,7 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
                 setResults(boundingBoxes)
                 invalidate()
                 for(items in boundingBoxes){
-                    speakOut("There is a"+ items.clsName +" in 5 meters")
+                    speakOut("There is a "+ items.clsName +" in 5 meters")
                 }
             }
         }
