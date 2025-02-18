@@ -1,22 +1,31 @@
 package com.example.visionmate
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
-import android.speech.RecognitionListener
-import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.example.visionmate.databinding.ActivityHomeBinding
+import com.example.visionmate.model.SpeechModel
+import com.google.gson.Gson
+import org.vosk.LibVosk
+import org.vosk.LogLevel
+import util.Commands
 
 class HomeActivity : AppCompatActivity() {
     private lateinit var binding: ActivityHomeBinding
-
+    val PERMISSIONS_REQUEST_RECORD_AUDIO: Int = 1
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        //startListening()
+        LibVosk.setLogLevel(LogLevel.INFO)
 
+        //startListening()
+/*
         PorcupineManager().startListening(this,{ result->
             Log.e("","")
             if(result){
@@ -24,7 +33,7 @@ class HomeActivity : AppCompatActivity() {
             }else{
                 navigateCamera()
             }
-        })
+        })*/
     }
 /*
 
@@ -107,6 +116,51 @@ class HomeActivity : AppCompatActivity() {
 
     fun navigateCamera(){
         startActivity(Intent(this,MainActivity::class.java))
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        // Check if user has given permission to record audio, init the model after permission is granted
+        val permissionCheck =
+            ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.RECORD_AUDIO)
+        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf<String>(Manifest.permission.RECORD_AUDIO),
+                PERMISSIONS_REQUEST_RECORD_AUDIO
+            )
+        } else {
+            startListening()
+        }
+        //startListening()
+    }
+
+    fun startListening(){
+        com.example.visionmate.speech_listener.SpeechRecognizer().startListening(this@HomeActivity, object:
+            org.vosk.android.RecognitionListener{
+            override fun onPartialResult(hypothesis: String?) {
+
+            }
+
+            override fun onResult(hypothesis: String?) {
+                var speechModel = Gson().fromJson(hypothesis, SpeechModel::class.java)
+                speechModel?.let { checkCommands(speechModel.text) }
+            }
+
+            override fun onFinalResult(hypothesis: String?) {
+
+            }
+
+            override fun onError(exception: Exception?) {
+
+            }
+
+            override fun onTimeout() {
+
+            }
+
+        })
     }
 
 }

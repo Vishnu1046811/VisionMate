@@ -41,8 +41,8 @@ class Detector(
 
     var OUTPUT_SIZE: Int = 192 //Output size of model
     var embeedings: Array<FloatArray> ?= null
-    private var registered: java.util.HashMap<String, SimilarityClassifier.Recognition> =
-        java.util.HashMap<String, SimilarityClassifier.Recognition>() //saved Faces
+    /*private var registered: java.util.HashMap<String, SimilarityClassifier.Recognition> =
+        java.util.HashMap<String, SimilarityClassifier.Recognition>() //saved Faces*/
 
     var distance: Float = 1.0f
 
@@ -57,7 +57,7 @@ class Detector(
         options.numThreads = 4
         interpreter = Interpreter(model, options)
 
-        registered = readFromSP() //Load saved faces from memory when app starts
+        //registered = readFromSP() //Load saved faces from memory when app starts
 
         val inputShape = interpreter?.getInputTensor(0)?.shape() ?: return
         val outputShape = interpreter?.getOutputTensor(0)?.shape() ?: return
@@ -170,7 +170,7 @@ class Detector(
                     )
                 )
                 if(clsName.contentEquals("person")){
-                    doFaceDetection { name ->
+                /*    doFaceDetection { name ->
                         boundingBoxes.add(
                             BoundingBox(
                                 x1 = x1, y1 = y1, x2 = x2, y2 = y2,
@@ -178,7 +178,7 @@ class Detector(
                                 cnf = maxConf, cls = maxIdx, clsName = name
                             )
                         )
-                    }
+                    }*/
                 }
             }
         }
@@ -188,6 +188,7 @@ class Detector(
         return applyNMS(boundingBoxes)
     }
 
+/*
     private fun doFaceDetection(completion: (name: String) -> Unit) {
         if(isFaceDetected { name ->
                 completion.invoke(name)
@@ -204,10 +205,12 @@ class Detector(
             )
             result.setExtra(embeedings)
 
-            registered.put("mohanlal", result)
+            //registered.put("mohanlal", result)
         }
     }
+*/
 
+/*
     private fun isFaceDetected(completion: (name:String) -> Unit): Boolean {
         var distance_local = Float.MAX_VALUE
         val id = "0"
@@ -223,9 +226,11 @@ class Detector(
                 distance_local = nearest[0]!!.second
 
 
-                    /*if (distance_local < distance) //If distance between Closest found face is more than 1.000 ,then output UNKNOWN face.
+                    */
+/*if (distance_local < distance) //If distance between Closest found face is more than 1.000 ,then output UNKNOWN face.
                         reco_name.setText(name)
-                    else reco_name.setText("Unknown")*/
+                    else reco_name.setText("Unknown")*//*
+
                     System.out.println("nearest: " + name + " - distance: " + distance_local);
                 completion(name)
                 return true
@@ -236,6 +241,7 @@ class Detector(
 
         return false
     }
+*/
 
     private fun applyNMS(boxes: List<BoundingBox>) : MutableList<BoundingBox> {
         val sortedBoxes = boxes.sortedByDescending { it.cnf }.toMutableList()
@@ -301,6 +307,8 @@ class Detector(
         //During type conversion and save/load procedure,format changes(eg float converted to double).
         //So embeddings need to be extracted from it in required format(eg.double to float).
         for ((_, value) in retrievedMap) {
+            if(value == null || value.getExtra() == null)
+                return retrievedMap
             val output = Array(1) { FloatArray(OUTPUT_SIZE) }
             var arrayList = value.getExtra() as ArrayList<*>
             arrayList = arrayList[0] as ArrayList<*>
@@ -321,7 +329,7 @@ class Detector(
     //        registered.put(name, rec);
     //    }
     //Compare Faces by distance between face embeddings
-    private fun findNearest(emb: FloatArray): List<Pair<String, Float>?> {
+/*    private fun findNearest(emb: FloatArray): List<Pair<String, Float>?> {
         val neighbour_list: MutableList<Pair<String, Float>?> = java.util.ArrayList()
         var ret: Pair<String, Float>? = null //to get closest match
         var prev_ret: Pair<String, Float>? = null //to get second closest match
@@ -344,6 +352,6 @@ class Detector(
         neighbour_list.add(prev_ret)
 
         return neighbour_list
-    }
+    }*/
 
 }
