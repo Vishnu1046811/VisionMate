@@ -16,4 +16,8 @@ interface LogDao {
 
     @Query("SELECT * FROM logs")
     fun getAllLogs(): List<LogEntry>
+
+
+    @Query("DELETE FROM logs")
+    fun clearAllLogs()
 }

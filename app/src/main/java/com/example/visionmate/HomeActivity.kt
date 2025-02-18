@@ -1,9 +1,8 @@
 package com.example.visionmate
 
-import ChatBot
+import com.example.visionmate.chatbot.ChatBot
 import android.content.Intent
 import android.os.Bundle
-import android.speech.RecognitionListener
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -20,9 +19,9 @@ class HomeActivity : AppCompatActivity() {
         setContentView(binding.root)
         lifecycleScope.launch (Dispatchers.IO){
         val chatBot = ChatBot(this@HomeActivity)
-
+            chatBot.reset()
         val conversationLogs = listOf(
-            "I saw a beautiful lady in the morning.",
+//            "I saw a beautiful lady in the morning.",
             "I went to the park to play cricket.",
             "I had a great lunch with my friends.",
             "I bought a new phone today.",
@@ -63,7 +62,7 @@ class HomeActivity : AppCompatActivity() {
 
         val sb = StringBuilder()
         exampleQueries.forEach {
-            sb.append("Q.$it")
+            sb.append("\nQ.$it")
             val answer = chatBot.getResponse(it)
             sb.append("\n")
             sb.append("A.$answer")
