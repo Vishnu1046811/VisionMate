@@ -11,7 +11,6 @@ import android.speech.SpeechRecognizer
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.visionmate.Manifest
 import java.util.Locale
 
 class SpeechRecognitionListener() {
@@ -83,6 +82,7 @@ class SpeechRecognitionListener() {
         speechRecognizer?.startListening(speechIntent)
     }
 
+/*
     //Example of using the Google Cloud Speech API (requires setup and credentials)
     private fun processAudioWithGoogleCloudSpeech(audioData: ByteArray) {
         try {
@@ -110,6 +110,7 @@ class SpeechRecognitionListener() {
             println("Error processing audio: ${e.message}")
         }
     }
+*/
 
 
 }
