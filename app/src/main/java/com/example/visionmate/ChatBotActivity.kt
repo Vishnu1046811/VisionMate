@@ -1,110 +1,138 @@
 package com.example.visionmate
 
-import android.content.Context
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.os.Bundle
+import android.speech.tts.UtteranceProgressListener
 import android.util.Log
-import androidx.appcompat.app.AppCompatActivity
-import com.applozic.mobicomkit.api.account.register.RegistrationResponse
-import com.applozic.mobicomkit.api.conversation.MessageBuilder
-import com.applozic.mobicomkit.exception.ApplozicException
-import com.applozic.mobicomkit.listners.MediaUploadProgressHandler
-import com.example.visionmate.Constants.APP_ID
-import io.kommunicate.KmConversationBuilder
-import io.kommunicate.Kommunicate
-import io.kommunicate.callbacks.KMLoginHandler
-import io.kommunicate.callbacks.KmCallback
-import io.kommunicate.users.KMUser
+import com.example.visionmate.chatbot.ChatBotModel
+import com.example.visionmate.databinding.ActivityChatBotBinding
+import com.example.visionmate.diary_logger.DiaryLogger
+import com.example.visionmate.model.SpeechModel
+import com.example.visionmate.speech_listener.SpeechRecognizer
+import com.google.gson.Gson
 
-class ChatBotActivity: AppCompatActivity() {
-
+class ChatBotActivity : BaseActivity() {
+    private var chatBot: ChatBotModel? = null
+    private lateinit var speechRecognizer: SpeechRecognizer
+    private lateinit var binding: ActivityChatBotBinding
+    private val animatorSet = AnimatorSet()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        binding = ActivityChatBotBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        initChatBot()
-        loginChatBot()
 
-    }
+        speakOut("ChatBot Ready to assist you")
+        chatBot = ChatBotModel(this)
+        DiaryLogger.INSTANCE.attachChatBot(chatBot)
 
-    private fun loginChatBot() {
-        val user = KMUser().apply {
-            userId = "1234"
-        }
-        Kommunicate.login(this, user, object : KMLoginHandler {
-            override fun onSuccess(registrationResponse: RegistrationResponse, context: Context) {
-                // You can perform operations such as opening the conversation, creating a new conversation or update user details on success
-                Log.e("",""+registrationResponse)
-                launchConversation(user)
+        speechRecognizer = SpeechRecognizer()
+
+        TextToSpeechManager.getSpeakObj().setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {
+                pauseListening(true)
             }
 
-            override fun onFailure(
-                registrationResponse: RegistrationResponse,
-                exception: java.lang.Exception
-            ) {
-                Log.e("",""+exception.printStackTrace())
-                // You can perform actions such as repeating the login call or throw an error message on failure
+            override fun onDone(utteranceId: String?) {
+                pauseListening(false)
+            }
+
+            override fun onError(utteranceId: String?) {
+                pauseListening(false)
             }
         })
+
+
+
+        val animator1 = ObjectAnimator.ofFloat(binding.ivMic,"ScaleX",1f,0.7f)
+        val animator2 = ObjectAnimator.ofFloat(binding.ivMic,"ScaleY",1f,0.7f)
+        animator2.repeatMode = ObjectAnimator.REVERSE
+        animator2.repeatCount = ObjectAnimator.INFINITE
+        animator1.repeatMode = ObjectAnimator.REVERSE
+        animator1.repeatCount = ObjectAnimator.INFINITE
+        animatorSet.playTogether(animator1,animator2)
+        animatorSet.duration = 1500
+        animatorSet.start()
+
+    }
+
+    override fun onResume() {
+        super.onResume()
+        startListening()
     }
 
 
-    private fun launchConversation(user: KMUser) {
-        KmConversationBuilder(this)
-            .setKmUser(user)
-            .launchConversation(object : KmCallback {
-                override fun onSuccess(message: Any) {
-                    Log.d("Conversation", "Success : $message")
-                    sendMessge(this@ChatBotActivity, "Hello there")
+
+    fun startListening() {
+
+        speechRecognizer.startListening(this@ChatBotActivity, object :
+                org.vosk.android.RecognitionListener {
+                override fun onPartialResult(hypothesis: String?) {
+
                 }
 
+                override fun onResult(hypothesis: String?) {
+                    if (chatBot?.isProcessing != true && !TextToSpeechManager.isSpeaking()) {
+                        pauseListening(false)
+                        val speechModel = Gson().fromJson(hypothesis, SpeechModel::class.java)
+                        Log.e("TAG", "onResult: ${speechModel.text}", )
+                        if (speechModel.text.trim().isNotEmpty()) {
+                            chatBot?.getAnswer(speechModel.text, onAnswer = {
+                                binding.tvMessage.text = it
+                                TextToSpeechManager.speakOut(it)
+                            })
+                        } else {
+                            pauseListening(false)
+                        }
 
-                override fun onFailure(error: Any) {
-                    Log.d("Conversation", "Failure : $error")
+                    }
+
                 }
+
+                override fun onFinalResult(hypothesis: String?) {
+
+                }
+
+                override fun onError(exception: java.lang.Exception?) {
+
+                }
+
+                override fun onTimeout() {
+
+                }
+
             })
     }
 
-    private fun sendMessge(context: Context,message:String) {
-        Kommunicate.openConversation(this, null)
-        MessageBuilder(context)
-            .setContentType(com.applozic.mobicomkit.api.conversation.Message.ContentType.ATTACHMENT.value)
-            .setGroupId(12345)
-            .setFilePath("the files absolute path in string")
-            .send(object : MediaUploadProgressHandler {
-                override fun onUploadStarted(e: ApplozicException?, oldMessageKey: String?) {
-                    if (e == null) {
-                        // the upload has started
-                    }
-                }
 
-                override fun onProgressUpdate(percentage: Int, e: ApplozicException?, oldMessageKey: String?) {
-                    if (e == null) {
-                        // display this upload percentage on the UI
-                    }
-                }
-
-                override fun onCancelled(e: ApplozicException?, oldMessageKey: String?) {
-                    // the upload was interrupted, most of the times by the user
-                }
-
-                override fun onCompleted(e: ApplozicException?, oldMessageKey: String?) {
-                    if (e == null) {
-                        // The upload has finished
-                    } else {
-                        // The upload has failed, due to network error or server error
-                    }
-                }
-
-                override fun onSent(
-                    message: com.applozic.mobicomkit.api.conversation.Message?,
-                    oldMessageKey: String?
-                ) {
-                    // The message containing the attachment has been sent to the server.
-                }
-
-            })
+    private fun pauseListening(pause: Boolean) {
+        if (pause) {
+            speechRecognizer.pause()
+            listeningAnimation(false)
+        } else {
+            speechRecognizer.resume()
+            listeningAnimation(true)
+        }
     }
 
-    private fun initChatBot() {
-        Kommunicate.init(this, APP_ID);
+    private fun listeningAnimation(listening: Boolean) {
+        if (listening) {
+            animatorSet.resume()
+        } else {
+            animatorSet.pause()
+        }
+    }
+
+    fun checkCommad(text: String) {
+//        Log.e("TAG", "checkCommad: $text ", )
+//        if(Commands.chatBotSummariseRegex.commandContain(text)){
+//            DiaryLogger.INSTANCE.summarize{
+//                if (it != null) {
+//                    //tts?.stop()
+//                    speakOut(it)
+//                }
+//            }
+//        }
     }
 }

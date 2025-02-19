@@ -28,8 +28,8 @@ class SpeechRecognizer {
 
     fun startListening(context: Context,recognitionListener: RecognitionListener) {
         StorageService.unpack(
-            context, "model-en-us",  "model",
-            StorageService.Callback<Model> { model: Model? ->
+            context, "vosk-model-small-en-in-0.4",  "model",
+            { model: Model? ->
                 this.model =
                     model!!
                 //setUiState(org.vosk.demo.VoskActivity.STATE_READY)
@@ -39,11 +39,18 @@ class SpeechRecognizer {
                     speechService.startListening(recognitionListener)
                 }
             },
-            StorageService.Callback<IOException> { exception: IOException ->
+            { exception: IOException ->
                 Log.e("",
                     "Failed to unpack the model" + exception.message
                 )
             })
+    }
+
+    fun pause() {
+        speechService.setPause(true)
+    }
+    fun resume() {
+        speechService.setPause(false)
     }
 
   /*  override fun onPartialResult(hypothesis: String?) {

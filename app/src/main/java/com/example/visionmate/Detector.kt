@@ -1,11 +1,13 @@
 package com.example.visionmate
 
+import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Pair
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import com.example.visionmate.face_detection.SimilarityClassifier
 import com.example.visionmate.face_detection.SimilarityClassifier.Recognition
 import com.google.gson.Gson
@@ -38,6 +40,7 @@ class Detector(
     private var tensorHeight = 0
     private var numChannel = 0
     private var numElements = 0
+
 
     var OUTPUT_SIZE: Int = 192 //Output size of model
     var embeedings: Array<FloatArray> ?= null
@@ -109,7 +112,22 @@ class Detector(
         interpreter?.run(imageBuffer, output.buffer)
 
 
-        val bestBoxes = bestBox(output.floatArray)
+        val bestBoxes = bestBox(output.floatArray) {
+
+
+            (context as MainActivity).detectUser(frame) { isDetected, faceModel ->
+                if (!isDetected) {
+                    //(context as MainActivity).saveUserImage(frame)
+                } else {
+                    (context as Activity).runOnUiThread(){
+                        val builder = AlertDialog.Builder(context).setTitle(faceModel.identified_name).show()
+
+                        Toast.makeText(context,"Detected "+faceModel.identified_name,Toast.LENGTH_SHORT).show()
+
+                    }
+                }
+            }
+        }
         inferenceTime = SystemClock.uptimeMillis() - inferenceTime
 
 
@@ -127,7 +145,7 @@ class Detector(
         detectorListener.onDetect(bestBoxes, inferenceTime)
     }
 
-    private fun bestBox(array: FloatArray) : List<BoundingBox>? {
+    private fun bestBox(array: FloatArray, completion: () -> Unit) : List<BoundingBox>? {
 
         val boundingBoxes = mutableListOf<BoundingBox>()
 
@@ -170,6 +188,8 @@ class Detector(
                     )
                 )
                 if(clsName.contentEquals("person")){
+
+                    completion.invoke()
                 /*    doFaceDetection { name ->
                         boundingBoxes.add(
                             BoundingBox(

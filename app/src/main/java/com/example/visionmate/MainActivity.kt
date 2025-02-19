@@ -1,6 +1,7 @@
 package com.example.visionmate
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -9,7 +10,10 @@ import android.speech.RecognitionListener
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import android.util.Size
+import android.view.View
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
@@ -22,17 +26,45 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.visionmate.Constants.LABELS_PATH
 import com.example.visionmate.Constants.MODEL_PATH
+import com.example.visionmate.SettingsActivity.Companion.getLivenessLevel
 import com.example.visionmate.chatbot.ChatBotModel
+import com.example.visionmate.component.DoubleTapView
 import com.example.visionmate.databinding.ActivityMainBinding
 import com.example.visionmate.diary_logger.DiaryLogger
+import com.example.visionmate.model.FaceModel
 import com.example.visionmate.model.SpeechModel
 import com.google.gson.Gson
+import com.kbyai.facesdk.FaceBox
+import com.kbyai.facesdk.FaceDetectionParam
+import com.kbyai.facesdk.FaceSDK
+import io.fotoapparat.parameter.Resolution
+import io.fotoapparat.preview.Frame
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import util.Commands
+import util.Helper
+import util.Utils
+import java.io.ByteArrayOutputStream
+import util.commandContain
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.random.Random
 
 class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeech.OnInitListener {
+
+    companion object {
+        private const val TAG = "Camera"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS = mutableListOf(
+            Manifest.permission.CAMERA
+        ).toTypedArray()
+
+        private const val CAMERA_DETECTION_DELAY = 1000L
+    }
+
     private lateinit var binding: ActivityMainBinding
     private val isFrontCamera = false
 
@@ -42,32 +74,42 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
     private var cameraProvider: ProcessCameraProvider? = null
     private lateinit var detector: Detector
 
-    private var tts: TextToSpeech? = null
+//    private var tts: TextToSpeech? = null
     private lateinit var textView: TextView
 
     private lateinit var cameraExecutor: ExecutorService
     var speechRecognizerWrapper :SpeechRecognizerWrapper?= null
 
-    private var diaryLogger: DiaryLogger? = null
     private var chatBot: ChatBotModel? = null
+
+    lateinit var dbManager: DBManager
+
+    var isFaceDetectionCoolOfTime = false
+
+    private var captureAndSummarize = false
+    private var pauseObjDetector = false
+
+
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
+        dbManager = DBManager(this)
         textView = binding.speechText
 
         // Initialize TextToSpeech object
-        tts = TextToSpeech(this, this)
+//        tts = TextToSpeech(this, this)
 
-        detector = Detector(baseContext, MODEL_PATH, LABELS_PATH, this)
+        detector = Detector(this, MODEL_PATH, LABELS_PATH, this)
         detector.setup()
 
-        diaryLogger = DiaryLogger(this)
+
+
+        //diaryLogger = DiaryLogger(this)
         chatBot = ChatBotModel(this)
-        diaryLogger?.attachChatBot(chatBot)
+        DiaryLogger.INSTANCE.attachChatBot(chatBot)
 
         if (allPermissionsGranted()) {
             //startCamera()
@@ -78,18 +120,123 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         cameraExecutor = Executors.newSingleThreadExecutor()
         //initListener()
 
-        binding.btnSummarize.setOnClickListener {
-            diaryLogger?.summarize{
-                if (it != null) {
-                    tts?.stop()
-                    speakOut(it)
+
+        binding.tapDetector.setOnLongClickListener {
+            TextToSpeechManager.stopSpeak()
+            TextToSpeechManager.speakOut("Processing image, please wait.")
+            pauseObjDetector = true
+            captureAndSummarize = true
+            true
+        }
+
+        dbManager = DBManager(this)
+        dbManager.loadPerson()
+
+    }
+
+    fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
+        val stream = ByteArrayOutputStream()
+        // Compress the bitmap to a byte array (PNG format with 100% quality)
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        return stream.toByteArray()
+    }
+    fun detectUser(image: Bitmap, completion : (isDetected: Boolean, facemodel: FaceModel) -> Unit ){
+
+        if(isFaceDetectionCoolOfTime){
+            return
+        }
+        enableCoolOfTime()
+        val frame:Frame = Frame(Resolution(image.width,image.height),bitmapToByteArray(image),0)
+
+        //val bitmap = FaceSDK.yuv2Bitmap(frame.image, frame.size.width, frame.size.height, CameraSelector.LENS_FACING_FRONT)
+
+      val faceDetectionParam = FaceDetectionParam()
+        faceDetectionParam.check_liveness = true
+        faceDetectionParam.check_liveness_level = getLivenessLevel(this)
+        val faceBoxes = FaceSDK.faceDetection(image, faceDetectionParam)
+
+        runOnUiThread {
+            Log.e("","")
+            //faceView.setFrameSize(Size(bitmap.width, bitmap.height))
+            //faceView.setFaceBoxes(faceBoxes)
+        }
+
+        if(faceBoxes.size > 0) {
+            val faceBox = faceBoxes[0]
+            if (faceBox.liveness > SettingsActivity.getLivenessThreshold(this)) {
+                val templates = FaceSDK.templateExtraction(image, faceBox)
+
+                var maxSimiarlity = 0f
+                var maximiarlityPerson: Person? = null
+                for (person in DBManager.personList) {
+                    val similarity = FaceSDK.similarityCalculation(templates, person.templates)
+                    if (similarity > maxSimiarlity) {
+                        maxSimiarlity = similarity
+                        maximiarlityPerson = person
+                    }
+                }
+                if (maxSimiarlity > SettingsActivity.getIdentifyThreshold(this)) {
+                    //recognized = true
+                    val identifiedPerson = maximiarlityPerson
+                    val identifiedSimilarity = maxSimiarlity
+
+                    runOnUiThread {
+                        val faceImage = Utils.cropFace(image, faceBox)
+                        val intent = Intent(this, ResultActivity::class.java)
+                        intent.putExtra("identified_face", faceImage)
+                        intent.putExtra("enrolled_face", identifiedPerson!!.face)
+                        intent.putExtra("identified_name", identifiedPerson!!.name)
+                        intent.putExtra("similarity", identifiedSimilarity)
+                        intent.putExtra("liveness", faceBox.liveness)
+                        intent.putExtra("yaw", faceBox.yaw)
+                        intent.putExtra("roll", faceBox.roll)
+                        intent.putExtra("pitch", faceBox.pitch)
+                        //startActivity(intent)
+
+                        completion.invoke(true,FaceModel(faceImage,identifiedPerson!!.face,identifiedPerson!!.name,identifiedSimilarity,faceBox.liveness))
+                    }
                 }
             }
         }
 
     }
 
+    private fun enableCoolOfTime() {
+        isFaceDetectionCoolOfTime = true
+        CoroutineScope(Dispatchers.IO).launch {
+            delay(15000)
+            isFaceDetectionCoolOfTime = false
+        }
 
+    }
+
+    fun saveUserImage(bitmap: Bitmap){
+        try {
+            val uri = Helper.saveBitmapToFile(this,bitmap, System.currentTimeMillis().toString()+"testfile.png")
+            var bitmap: Bitmap = Utils.getCorrectlyOrientedImage(this, Helper.saveBitmapToFile(this,bitmap, System.currentTimeMillis().toString()+"testfile.png"))
+
+            val faceDetectionParam = FaceDetectionParam()
+            faceDetectionParam.check_liveness = true
+            faceDetectionParam.check_liveness_level = 1// SettingsActivity.getLivenessLevel(this)
+            var faceBoxes: List<FaceBox>? = FaceSDK.faceDetection(bitmap, faceDetectionParam)
+
+            if(faceBoxes.isNullOrEmpty()) {
+               // Toast.makeText(this, getString(R.string.no_face_detected), Toast.LENGTH_SHORT).show()
+            } else if (faceBoxes.size > 1) {
+                Toast.makeText(this, getString(R.string.multiple_face_detected), Toast.LENGTH_SHORT).show()
+            } else {
+                val faceImage = Utils.cropFace(bitmap, faceBoxes[0])
+                val templates = FaceSDK.templateExtraction(bitmap, faceBoxes[0])
+
+                dbManager.insertPerson("Hafiz" + Random.nextInt(10000, 20000), faceImage, templates)
+                //personAdapter.notifyDataSetChanged()
+                //Toast.makeText(this, getString(R.string.person_enrolled), Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: java.lang.Exception) {
+            //handle exception
+            e.printStackTrace()
+        }
+    }
 
 
     override fun onRequestPermissionsResult(
@@ -107,31 +254,38 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
 
 
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            // Set the language for the TTS engine
-            val result = tts!!.setLanguage(Locale.US) // Change Locale.US to your desired language
-
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                Log.e("TTS", "The Language not supported!")
-            } else {
-                //btnSpeak!!.isEnabled = true
-            }
-        }
+//        if (status == TextToSpeech.SUCCESS) {
+//            // Set the language for the TTS engine
+//            val result = tts!!.setLanguage(Locale.US) // Change Locale.US to your desired language
+//
+//            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+//                Log.e("TTS", "The Language not supported!")
+//            } else {
+//                //btnSpeak!!.isEnabled = true
+//            }
+//        }
     }
 
-    private fun speakOut(text: String) {
-        //val text = etSpeak!!.text.toString()
-        if(tts?.isSpeaking==true)
-            return
-        tts!!.speak(text, TextToSpeech.QUEUE_FLUSH, null, "")
-
-    }
+//    private fun speakOut(text: String) {
+//        //val text = etSpeak!!.text.toString()
+//        if(tts?.isSpeaking==true)
+//            return
+//        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "")
+//
+//    }
 
     private fun checkCommands(text: String) {
+        Log.e(TAG, "checkCommands: $text", )
         if(Commands.quitRegex.matches(text)){
             finishAffinity()
         }else if(Commands.homeBotRegex.matches(text)){
             onBackPressed()
+        } /*else if (Commands.chatBotSummariseRegex.commandContain(text)) {
+           summarize()
+        }*/
+        else if (Commands.captureScreenCommand.commandContain(text)) {
+            pauseObjDetector = true
+           captureAndSummarize = true
         }
     /*    when(text.toLowerCase()){
             Commands.VoiceCommands.EXIT.rawValue ->{
@@ -141,6 +295,14 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
                 finish()
             }
         }*/
+    }
+
+    private fun summarize() {
+        DiaryLogger.INSTANCE?.summarize {
+            if (it != null) {
+                TextToSpeechManager.speakOut(it)
+            }
+        }
     }
 
     private fun startCamera() {
@@ -201,9 +363,25 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
                 bitmapBuffer, 0, 0, bitmapBuffer.width, bitmapBuffer.height,
                 matrix, true
             )
-            // Logging scene to text file.
-            diaryLogger?.logScene(rotatedBitmap)
-            detector.detect(rotatedBitmap)
+
+            if (!pauseObjDetector) {
+                // Logging scene to text file.
+                DiaryLogger.INSTANCE.logScene(rotatedBitmap)
+                detector.detect(rotatedBitmap)
+            }
+
+            if (captureAndSummarize) {
+                captureAndSummarize = false
+                DiaryLogger.INSTANCE.captureAndSummarize(rotatedBitmap) {
+                    Log.e(TAG, "bindCameraUseCases: $it", )
+                    if (it != null) {
+//                        TextToSpeechManager.stopSpeak()
+                        TextToSpeechManager.speakOut(it)
+                    }
+                    pauseObjDetector = false
+                }
+            }
+
         }
 
         cameraProvider.unbindAll()
@@ -238,10 +416,10 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         super.onDestroy()
         detector.clear()
         cameraExecutor.shutdown()
-        if (tts != null) {
-            tts!!.stop()
-            tts!!.shutdown()
-        }
+//        if (tts != null) {
+//            tts!!.stop()
+//            tts!!.shutdown()
+//        }
     }
 
     override fun onResume() {
@@ -277,28 +455,37 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         speechRecognizerWrapper?.destroy()
     }
 
-    companion object {
-        private const val TAG = "Camera"
-        private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = mutableListOf(
-            Manifest.permission.CAMERA
-        ).toTypedArray()
-    }
+
 
     override fun onEmptyDetect() {
         binding.overlay.invalidate()
     }
 
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
+        Log.d(
+            TAG,
+            "onDetect() called with: boundingBoxes = $boundingBoxes, inferenceTime = $inferenceTime"
+        )
         runOnUiThread {
-            binding.inferenceTime.text = "${inferenceTime}ms"
             binding.overlay.apply {
-                setResults(boundingBoxes)
-                invalidate()
-                for(items in boundingBoxes){
-                    speakOut("There is a "+ items.clsName +" in 5 meters")
-                }
+//                setResults(boundingBoxes)
+//                invalidate()
+
+//                for(items in boundingBoxes){
+//                    speakOut("There is a "+ items.clsName)
+//                }
+                boundingBoxes.firstOrNull()?.let { speakObject(it) }
             }
+        }
+    }
+
+    private fun speakObject(item: BoundingBox) {
+        if (item.cx < 0.33) {
+            TextToSpeechManager.speakOut("There is a "+ item.clsName + " on your left side")
+        } else if (item.cx > 0.66) {
+            TextToSpeechManager.speakOut("There is a "+ item.clsName + " on your right side")
+        } else {
+            TextToSpeechManager.speakOut("There is a "+ item.clsName + " in front of you")
         }
     }
 

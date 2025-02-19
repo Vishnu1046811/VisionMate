@@ -31,10 +31,12 @@ class ChatBotModel(context: Context) {
                 "--------------------------------------------------\n" +
                 "<CONTEXT>\n" +
                 "--------------------------------------------------\n" +
-                "Here is the user\\'s query: <QUERY>"
+                "Here is the user's query: <QUERY>"
     }
     private val chunkDb = ChunksDB()
     private val encoder = SentenceEmbeddingProvider(context)
+    var isProcessing = false
+        private set
 
 
 
@@ -51,7 +53,8 @@ class ChatBotModel(context: Context) {
         query: String,
         onAnswer: (answer: String)-> Unit
     ) {
-        val apiKey = "---"
+        isProcessing = true
+        val apiKey = ""
         val geminiRemoteAPI = GeminiRemoteAPI(apiKey)
         try {
             var jointContext = ""
@@ -66,11 +69,13 @@ class ChatBotModel(context: Context) {
                 geminiRemoteAPI.getResponse(inputPrompt)?.let { llmResponse ->
                     withContext(Dispatchers.Main) {
                         onAnswer(llmResponse)
+
                     }
                 }
+                isProcessing = false
             }
         } catch (e: Exception) {
-
+            isProcessing = false
             throw e
         }
     }

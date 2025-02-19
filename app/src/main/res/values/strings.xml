@@ -2,4 +2,9 @@
     <string name="app_name">VisionMate</string>
     <string name="action_camera">Open Camera</string>
     <string name="action_chatbot">Open ChatBot</string>
+    <string name="no_face_detected">no_face_detected</string>
+    <string name="multiple_face_detected">multiple_face_detected</string>
+    <string name="action_enroll_members">Enroll Members</string>
+    <string name="select_picture">Select Picture</string>
+    <string name="person_enrolled">Person enrolled!</string>
 </resources>

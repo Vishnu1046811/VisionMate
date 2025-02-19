@@ -8,7 +8,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.visionmate"
+        applicationId = "com.kbyai.facerecognition"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -88,6 +88,7 @@ dependencies {
     //implementation(libs.vosk)
     //implementation(libs.jna)
     implementation(libs.vosk.android)
+    implementation(libs.androidx.preference.ktx)
     //implementation(libs.litert.support.api)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -136,6 +137,9 @@ dependencies {
 
     // Gemini SDK - LLM
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+
+    implementation(project(":libfotoapparat"))
+    implementation(project(":libfacesdk"))
 }
 
 apply(plugin = "io.objectbox")
