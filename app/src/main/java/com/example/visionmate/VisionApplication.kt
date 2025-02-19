@@ -12,10 +12,13 @@ package com.example.visionmate
 
 import android.app.Application
 import com.example.visionmate.chatbot.data.ObjectBoxStore
+import com.example.visionmate.diary_logger.DiaryLogger
 
 class VisionApplication: Application() {
     override fun onCreate() {
         super.onCreate()
+        TextToSpeechManager.init(this)
         ObjectBoxStore.init(this)
+        DiaryLogger.init(this)
     }
 }

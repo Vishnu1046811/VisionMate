@@ -23,16 +23,29 @@ import androidx.core.content.ContextCompat
 import com.example.visionmate.Constants.LABELS_PATH
 import com.example.visionmate.Constants.MODEL_PATH
 import com.example.visionmate.chatbot.ChatBotModel
+import com.example.visionmate.component.DoubleTapView
 import com.example.visionmate.databinding.ActivityMainBinding
 import com.example.visionmate.diary_logger.DiaryLogger
 import com.example.visionmate.model.SpeechModel
 import com.google.gson.Gson
 import util.Commands
+import util.commandContain
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeech.OnInitListener {
+
+    companion object {
+        private const val TAG = "Camera"
+        private const val REQUEST_CODE_PERMISSIONS = 10
+        private val REQUIRED_PERMISSIONS = mutableListOf(
+            Manifest.permission.CAMERA
+        ).toTypedArray()
+
+        private const val CAMERA_DETECTION_DELAY = 1000L
+    }
+
     private lateinit var binding: ActivityMainBinding
     private val isFrontCamera = false
 
@@ -42,14 +55,19 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
     private var cameraProvider: ProcessCameraProvider? = null
     private lateinit var detector: Detector
 
-    private var tts: TextToSpeech? = null
+//    private var tts: TextToSpeech? = null
     private lateinit var textView: TextView
 
     private lateinit var cameraExecutor: ExecutorService
     var speechRecognizerWrapper :SpeechRecognizerWrapper?= null
 
-    private var diaryLogger: DiaryLogger? = null
     private var chatBot: ChatBotModel? = null
+
+
+    private var captureAndSummarize = false
+    private var pauseObjDetector = false
+
+
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,14 +78,13 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         textView = binding.speechText
 
         // Initialize TextToSpeech object
-        tts = TextToSpeech(this, this)
+//        tts = TextToSpeech(this, this)
 
         detector = Detector(baseContext, MODEL_PATH, LABELS_PATH, this)
         detector.setup()
 
-        diaryLogger = DiaryLogger(this)
         chatBot = ChatBotModel(this)
-        diaryLogger?.attachChatBot(chatBot)
+        DiaryLogger.INSTANCE.attachChatBot(chatBot)
 
         if (allPermissionsGranted()) {
             //startCamera()
@@ -78,15 +95,14 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         cameraExecutor = Executors.newSingleThreadExecutor()
         //initListener()
 
-        binding.btnSummarize.setOnClickListener {
-            diaryLogger?.summarize{
-                if (it != null) {
-                    tts?.stop()
-                    speakOut(it)
-                }
-            }
-        }
 
+        binding.tapDetector.setOnLongClickListener {
+            TextToSpeechManager.stopSpeak()
+            TextToSpeechManager.speakOut("Processing image, please wait.")
+            pauseObjDetector = true
+            captureAndSummarize = true
+            true
+        }
     }
 
 
@@ -107,31 +123,38 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
 
 
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            // Set the language for the TTS engine
-            val result = tts!!.setLanguage(Locale.US) // Change Locale.US to your desired language
-
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                Log.e("TTS", "The Language not supported!")
-            } else {
-                //btnSpeak!!.isEnabled = true
-            }
-        }
+//        if (status == TextToSpeech.SUCCESS) {
+//            // Set the language for the TTS engine
+//            val result = tts!!.setLanguage(Locale.US) // Change Locale.US to your desired language
+//
+//            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+//                Log.e("TTS", "The Language not supported!")
+//            } else {
+//                //btnSpeak!!.isEnabled = true
+//            }
+//        }
     }
 
-    private fun speakOut(text: String) {
-        //val text = etSpeak!!.text.toString()
-        if(tts?.isSpeaking==true)
-            return
-        tts!!.speak(text, TextToSpeech.QUEUE_FLUSH, null, "")
-
-    }
+//    private fun speakOut(text: String) {
+//        //val text = etSpeak!!.text.toString()
+//        if(tts?.isSpeaking==true)
+//            return
+//        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "")
+//
+//    }
 
     private fun checkCommands(text: String) {
+        Log.e(TAG, "checkCommands: $text", )
         if(Commands.quitRegex.matches(text)){
             finishAffinity()
         }else if(Commands.homeBotRegex.matches(text)){
             onBackPressed()
+        } /*else if (Commands.chatBotSummariseRegex.commandContain(text)) {
+           summarize()
+        }*/
+        else if (Commands.captureScreenCommand.commandContain(text)) {
+            pauseObjDetector = true
+           captureAndSummarize = true
         }
     /*    when(text.toLowerCase()){
             Commands.VoiceCommands.EXIT.rawValue ->{
@@ -141,6 +164,14 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
                 finish()
             }
         }*/
+    }
+
+    private fun summarize() {
+        DiaryLogger.INSTANCE?.summarize {
+            if (it != null) {
+                TextToSpeechManager.speakOut(it)
+            }
+        }
     }
 
     private fun startCamera() {
@@ -201,9 +232,25 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
                 bitmapBuffer, 0, 0, bitmapBuffer.width, bitmapBuffer.height,
                 matrix, true
             )
-            // Logging scene to text file.
-            diaryLogger?.logScene(rotatedBitmap)
-            detector.detect(rotatedBitmap)
+
+            if (!pauseObjDetector) {
+                // Logging scene to text file.
+                DiaryLogger.INSTANCE.logScene(rotatedBitmap)
+                detector.detect(rotatedBitmap)
+            }
+
+            if (captureAndSummarize) {
+                captureAndSummarize = false
+                DiaryLogger.INSTANCE.captureAndSummarize(rotatedBitmap) {
+                    Log.e(TAG, "bindCameraUseCases: $it", )
+                    if (it != null) {
+//                        TextToSpeechManager.stopSpeak()
+                        TextToSpeechManager.speakOut(it)
+                    }
+                    pauseObjDetector = false
+                }
+            }
+
         }
 
         cameraProvider.unbindAll()
@@ -238,10 +285,10 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         super.onDestroy()
         detector.clear()
         cameraExecutor.shutdown()
-        if (tts != null) {
-            tts!!.stop()
-            tts!!.shutdown()
-        }
+//        if (tts != null) {
+//            tts!!.stop()
+//            tts!!.shutdown()
+//        }
     }
 
     override fun onResume() {
@@ -277,28 +324,37 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         speechRecognizerWrapper?.destroy()
     }
 
-    companion object {
-        private const val TAG = "Camera"
-        private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = mutableListOf(
-            Manifest.permission.CAMERA
-        ).toTypedArray()
-    }
+
 
     override fun onEmptyDetect() {
         binding.overlay.invalidate()
     }
 
     override fun onDetect(boundingBoxes: List<BoundingBox>, inferenceTime: Long) {
+        Log.d(
+            TAG,
+            "onDetect() called with: boundingBoxes = $boundingBoxes, inferenceTime = $inferenceTime"
+        )
         runOnUiThread {
-            binding.inferenceTime.text = "${inferenceTime}ms"
             binding.overlay.apply {
-                setResults(boundingBoxes)
-                invalidate()
-                for(items in boundingBoxes){
-                    speakOut("There is a "+ items.clsName +" in 5 meters")
-                }
+//                setResults(boundingBoxes)
+//                invalidate()
+
+//                for(items in boundingBoxes){
+//                    speakOut("There is a "+ items.clsName)
+//                }
+                boundingBoxes.firstOrNull()?.let { speakObject(it) }
             }
+        }
+    }
+
+    private fun speakObject(item: BoundingBox) {
+        if (item.cx < 0.33) {
+            TextToSpeechManager.speakOut("There is a "+ item.clsName + " on your left side")
+        } else if (item.cx > 0.66) {
+            TextToSpeechManager.speakOut("There is a "+ item.clsName + " on your right side")
+        } else {
+            TextToSpeechManager.speakOut("There is a "+ item.clsName + " in front of you")
         }
     }
 
