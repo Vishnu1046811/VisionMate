@@ -1,6 +1,7 @@
 package com.example.visionmate
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -9,7 +10,10 @@ import android.speech.RecognitionListener
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import android.util.Size
+import android.view.View
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
@@ -22,17 +26,32 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.visionmate.Constants.LABELS_PATH
 import com.example.visionmate.Constants.MODEL_PATH
+import com.example.visionmate.SettingsActivity.Companion.getLivenessLevel
 import com.example.visionmate.chatbot.ChatBotModel
 import com.example.visionmate.component.DoubleTapView
 import com.example.visionmate.databinding.ActivityMainBinding
 import com.example.visionmate.diary_logger.DiaryLogger
+import com.example.visionmate.model.FaceModel
 import com.example.visionmate.model.SpeechModel
 import com.google.gson.Gson
+import com.kbyai.facesdk.FaceBox
+import com.kbyai.facesdk.FaceDetectionParam
+import com.kbyai.facesdk.FaceSDK
+import io.fotoapparat.parameter.Resolution
+import io.fotoapparat.preview.Frame
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import util.Commands
+import util.Helper
+import util.Utils
+import java.io.ByteArrayOutputStream
 import util.commandContain
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.random.Random
 
 class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeech.OnInitListener {
 
@@ -63,6 +82,9 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
 
     private var chatBot: ChatBotModel? = null
 
+    lateinit var dbManager: DBManager
+
+    var isFaceDetectionCoolOfTime = false
 
     private var captureAndSummarize = false
     private var pauseObjDetector = false
@@ -74,15 +96,18 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
+        dbManager = DBManager(this)
         textView = binding.speechText
 
         // Initialize TextToSpeech object
 //        tts = TextToSpeech(this, this)
 
-        detector = Detector(baseContext, MODEL_PATH, LABELS_PATH, this)
+        detector = Detector(this, MODEL_PATH, LABELS_PATH, this)
         detector.setup()
 
+
+
+        //diaryLogger = DiaryLogger(this)
         chatBot = ChatBotModel(this)
         DiaryLogger.INSTANCE.attachChatBot(chatBot)
 
@@ -103,9 +128,115 @@ class MainActivity : AppCompatActivity(), Detector.DetectorListener, TextToSpeec
             captureAndSummarize = true
             true
         }
+
+        dbManager = DBManager(this)
+        dbManager.loadPerson()
+
     }
 
+    fun bitmapToByteArray(bitmap: Bitmap): ByteArray {
+        val stream = ByteArrayOutputStream()
+        // Compress the bitmap to a byte array (PNG format with 100% quality)
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        return stream.toByteArray()
+    }
+    fun detectUser(image: Bitmap, completion : (isDetected: Boolean, facemodel: FaceModel) -> Unit ){
 
+        if(isFaceDetectionCoolOfTime){
+            return
+        }
+        enableCoolOfTime()
+        val frame:Frame = Frame(Resolution(image.width,image.height),bitmapToByteArray(image),0)
+
+        //val bitmap = FaceSDK.yuv2Bitmap(frame.image, frame.size.width, frame.size.height, CameraSelector.LENS_FACING_FRONT)
+
+      val faceDetectionParam = FaceDetectionParam()
+        faceDetectionParam.check_liveness = true
+        faceDetectionParam.check_liveness_level = getLivenessLevel(this)
+        val faceBoxes = FaceSDK.faceDetection(image, faceDetectionParam)
+
+        runOnUiThread {
+            Log.e("","")
+            //faceView.setFrameSize(Size(bitmap.width, bitmap.height))
+            //faceView.setFaceBoxes(faceBoxes)
+        }
+
+        if(faceBoxes.size > 0) {
+            val faceBox = faceBoxes[0]
+            if (faceBox.liveness > SettingsActivity.getLivenessThreshold(this)) {
+                val templates = FaceSDK.templateExtraction(image, faceBox)
+
+                var maxSimiarlity = 0f
+                var maximiarlityPerson: Person? = null
+                for (person in DBManager.personList) {
+                    val similarity = FaceSDK.similarityCalculation(templates, person.templates)
+                    if (similarity > maxSimiarlity) {
+                        maxSimiarlity = similarity
+                        maximiarlityPerson = person
+                    }
+                }
+                if (maxSimiarlity > SettingsActivity.getIdentifyThreshold(this)) {
+                    //recognized = true
+                    val identifiedPerson = maximiarlityPerson
+                    val identifiedSimilarity = maxSimiarlity
+
+                    runOnUiThread {
+                        val faceImage = Utils.cropFace(image, faceBox)
+                        val intent = Intent(this, ResultActivity::class.java)
+                        intent.putExtra("identified_face", faceImage)
+                        intent.putExtra("enrolled_face", identifiedPerson!!.face)
+                        intent.putExtra("identified_name", identifiedPerson!!.name)
+                        intent.putExtra("similarity", identifiedSimilarity)
+                        intent.putExtra("liveness", faceBox.liveness)
+                        intent.putExtra("yaw", faceBox.yaw)
+                        intent.putExtra("roll", faceBox.roll)
+                        intent.putExtra("pitch", faceBox.pitch)
+                        //startActivity(intent)
+
+                        completion.invoke(true,FaceModel(faceImage,identifiedPerson!!.face,identifiedPerson!!.name,identifiedSimilarity,faceBox.liveness))
+                    }
+                }
+            }
+        }
+
+    }
+
+    private fun enableCoolOfTime() {
+        isFaceDetectionCoolOfTime = true
+        CoroutineScope(Dispatchers.IO).launch {
+            delay(15000)
+            isFaceDetectionCoolOfTime = false
+        }
+
+    }
+
+    fun saveUserImage(bitmap: Bitmap){
+        try {
+            val uri = Helper.saveBitmapToFile(this,bitmap, System.currentTimeMillis().toString()+"testfile.png")
+            var bitmap: Bitmap = Utils.getCorrectlyOrientedImage(this, Helper.saveBitmapToFile(this,bitmap, System.currentTimeMillis().toString()+"testfile.png"))
+
+            val faceDetectionParam = FaceDetectionParam()
+            faceDetectionParam.check_liveness = true
+            faceDetectionParam.check_liveness_level = 1// SettingsActivity.getLivenessLevel(this)
+            var faceBoxes: List<FaceBox>? = FaceSDK.faceDetection(bitmap, faceDetectionParam)
+
+            if(faceBoxes.isNullOrEmpty()) {
+               // Toast.makeText(this, getString(R.string.no_face_detected), Toast.LENGTH_SHORT).show()
+            } else if (faceBoxes.size > 1) {
+                Toast.makeText(this, getString(R.string.multiple_face_detected), Toast.LENGTH_SHORT).show()
+            } else {
+                val faceImage = Utils.cropFace(bitmap, faceBoxes[0])
+                val templates = FaceSDK.templateExtraction(bitmap, faceBoxes[0])
+
+                dbManager.insertPerson("Hafiz" + Random.nextInt(10000, 20000), faceImage, templates)
+                //personAdapter.notifyDataSetChanged()
+                //Toast.makeText(this, getString(R.string.person_enrolled), Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: java.lang.Exception) {
+            //handle exception
+            e.printStackTrace()
+        }
+    }
 
 
     override fun onRequestPermissionsResult(

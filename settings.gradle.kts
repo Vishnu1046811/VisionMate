@@ -29,4 +29,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "VisionMate"
 include(":app",":models")
+include ( ":libfacesdk",":libfotoapparat")
+
  
