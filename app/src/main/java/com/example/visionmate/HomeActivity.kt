@@ -9,7 +9,6 @@ import android.util.Log
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
-import android.speech.tts.TextToSpeech
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -25,14 +24,15 @@ import org.vosk.LibVosk
 import org.vosk.LogLevel
 import util.Commands
 import util.Utils
-import kotlin.random.Random
 import util.commandContain
-import java.util.Locale
 
 class HomeActivity : AppCompatActivity() {
     companion object {
         private val SELECT_PHOTO_REQUEST_CODE = 1
     }
+
+    private lateinit var preferenceManager: PreferenceManager
+
     lateinit var dbManager: DBManager
     private lateinit var binding: ActivityHomeBinding
     val PERMISSIONS_REQUEST_RECORD_AUDIO: Int = 1
@@ -43,11 +43,17 @@ class HomeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
+        preferenceManager = PreferenceManager(this)
 
         dbManager = DBManager(this)
         LibVosk.setLogLevel(LogLevel.INFO)
-        welcomeSpeech()
+
+        // Fetch the boolean value
+        val isFirstRun = preferenceManager.fetchBoolean()
+        if (isFirstRun) {
+            welcomeSpeech()
+        }
+
         var ret = FaceSDK.setActivation(
             "S18+rOL1H3BXjAWGP7gEdgbJVotQ4g1o+YMcZruzEaKWFUQJHB2P1ylgw1FAfi+enDQA3nE4E9h6\n" +
                     "NF6xL8uRrs33P9vekwdJCBLlIPcx+keHdNiFjq/3848TZjgMeJ3Xpvh1grWIh9kdGbEfnh6x0/xI\n" +
@@ -60,47 +66,60 @@ class HomeActivity : AppCompatActivity() {
             ret = FaceSDK.init(assets)
         }
         if (ret != FaceSDK.SDK_SUCCESS) {
-            Log.e("","")
+            Log.e("", "")
             if (ret == FaceSDK.SDK_LICENSE_KEY_ERROR) {
-                Log.e("","")
+                Log.e("", "")
             } else if (ret == FaceSDK.SDK_LICENSE_APPID_ERROR) {
-                Log.e("","")
+                Log.e("", "")
             } else if (ret == FaceSDK.SDK_LICENSE_EXPIRED) {
-                Log.e("","")
+                Log.e("", "")
             } else if (ret == FaceSDK.SDK_NO_ACTIVATED) {
-                Log.e("","")
+                Log.e("", "")
             } else if (ret == FaceSDK.SDK_INIT_ERROR) {
-                Log.e("","")
+                Log.e("", "")
             }
         }
         //startListening()
-/*
-        PorcupineManager().startListening(this,{ result->
-            Log.e("","")
-            if(result){
-                navigateChatbot()
-            }else{
-                navigateCamera()
-            }
-        })*/
+        /*
+                PorcupineManager().startListening(this,{ result->
+                    Log.e("","")
+                    if(result){
+                        navigateChatbot()
+                    }else{
+                        navigateCamera()
+                    }
+                })*/
+
+        binding.cl1.setOnClickListener() {
+            enrollUserData()
+        }
+        binding.cl.setOnClickListener() {
+            summarize()
+        }
+        binding.clChatBot.setOnClickListener() {
+            navigateChatbot()
+        }
+        binding.clCamera.setOnClickListener() {
+            navigateCamera()
+        }
     }
 
 
-
     private fun checkCommands(spokenText: String) {
-        Log.e("TAG", "checkCommands: $spokenText", )
-        if(Commands.openCameraRegex.matches(spokenText)){
+        Log.e("TAG", "checkCommands: $spokenText")
+        if (Commands.openCameraRegex.matches(spokenText)) {
             navigateCamera()
-        }else if(Commands.openChatBotRegex.matches(spokenText)){
+        } else if (Commands.openChatBotRegex.matches(spokenText)) {
             navigateChatbot()
-        }else if(Commands.chatBotSummariseRegex.commandContain(spokenText)){
+        } else if (Commands.chatBotSummariseRegex.commandContain(spokenText)) {
             summarize()
-        }else if(Commands.enrollBotRegex.matches(spokenText)){
+        } else if (Commands.enrollBotRegex.matches(spokenText)) {
             enrollUserData()
         }
     }
 
     private fun summarize() {
+        speakOut("Preparing diary")
         DiaryLogger.INSTANCE.summarize {
             if (it != null) {
                 TextToSpeechManager.speakOut(it)
@@ -113,16 +132,19 @@ class HomeActivity : AppCompatActivity() {
         val intent = Intent()
         intent.setType("image/*")
         intent.setAction(Intent.ACTION_PICK)
-        startActivityForResult(Intent.createChooser(intent, getString(R.string.select_picture)), SELECT_PHOTO_REQUEST_CODE)
+        startActivityForResult(
+            Intent.createChooser(intent, getString(R.string.select_picture)),
+            SELECT_PHOTO_REQUEST_CODE
+        )
     }
 
     private fun navigateChatbot() {
 
-        startActivity(Intent(this,ChatBotActivity::class.java))
+        startActivity(Intent(this, ChatBotActivity::class.java))
     }
 
-    fun navigateCamera(){
-        startActivity(Intent(this,MainActivity::class.java))
+    fun navigateCamera() {
+        startActivity(Intent(this, MainActivity::class.java))
     }
 
     override fun onResume() {
@@ -154,9 +176,8 @@ class HomeActivity : AppCompatActivity() {
                 "\t3.\tDiary – We help you maintain a structured log of your day. The diary feature records daily events and experiences, along with relevant device information, so you can track patterns and retrieve past details whenever needed.\n, you can start diary using command 'Open Diary'" +
                 "\t4.\tEnroll Person – To enhance your social awareness, we offer a facial recognition module that allows you to register close family members or trusted individuals. This way, our app can recognize and inform you about the people around you., you can enroll person  using command 'Enroll'"
         speakOut(text)
+        preferenceManager.saveBoolean(false)
     }
-
-
 
 
     override fun onPause() {
@@ -164,38 +185,40 @@ class HomeActivity : AppCompatActivity() {
         isPaused = true
     }
 
-    fun startListening(){
-        com.example.visionmate.speech_listener.SpeechRecognizer().startListening(this@HomeActivity, object:
-            org.vosk.android.RecognitionListener{
-            override fun onPartialResult(hypothesis: String?) {
+    fun startListening() {
+        com.example.visionmate.speech_listener.SpeechRecognizer()
+            .startListening(this@HomeActivity, object :
+                org.vosk.android.RecognitionListener {
+                override fun onPartialResult(hypothesis: String?) {
 
-            }
-
-            override fun onResult(hypothesis: String?) {
-                if (!isPaused) {
-                    var speechModel = Gson().fromJson(hypothesis, SpeechModel::class.java)
-                    speechModel?.let { checkCommands(speechModel.text) }
                 }
-            }
 
-            override fun onFinalResult(hypothesis: String?) {
+                override fun onResult(hypothesis: String?) {
+                    if (!isPaused) {
+                        var speechModel = Gson().fromJson(hypothesis, SpeechModel::class.java)
+                        speechModel?.let { checkCommands(speechModel.text) }
+                    }
+                }
 
-            }
+                override fun onFinalResult(hypothesis: String?) {
 
-            override fun onError(exception: Exception?) {
+                }
 
-            }
+                override fun onError(exception: Exception?) {
 
-            override fun onTimeout() {
+                }
 
-            }
+                override fun onTimeout() {
 
-        })
+                }
+
+            })
     }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == SELECT_PHOTO_REQUEST_CODE && resultCode == RESULT_OK) {
             try {
-                showInputDialog { userName->
+                showInputDialog { userName ->
                     var bitmap: Bitmap = Utils.getCorrectlyOrientedImage(this, data?.data!!)
 
                     val faceDetectionParam = FaceDetectionParam()
@@ -241,7 +264,7 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
-    private fun showInputDialog(completion:(String) -> Unit) {
+    private fun showInputDialog(completion: (String) -> Unit) {
         val builder = AlertDialog.Builder(this)
         builder.setTitle("Enter user name")
 
@@ -252,7 +275,7 @@ class HomeActivity : AppCompatActivity() {
         // Set up the buttons
         builder.setPositiveButton("OK") { dialog, which ->
             val userInput = input.text.toString()
-            if(userInput.isNullOrEmpty())
+            if (userInput.isNullOrEmpty())
                 return@setPositiveButton
             completion.invoke(userInput)
 

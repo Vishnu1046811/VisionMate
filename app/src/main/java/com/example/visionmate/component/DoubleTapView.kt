@@ -12,12 +12,13 @@ class DoubleTapView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
-        override fun onDoubleTap(e: MotionEvent): Boolean {
-            onDoubleTapListener?.onDoubleTap()
-            return true
-        }
-    })
+    private val gestureDetector =
+        GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                onDoubleTapListener?.onDoubleTap()
+                return true
+            }
+        })
 
     var onDoubleTapListener: OnDoubleTapListener? = null
 

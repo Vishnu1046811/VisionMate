@@ -220,7 +220,7 @@ class DiaryLogger(context: Context) : CoroutineScope {
 
         private const val GPT_MODEL = "gpt-4o"
         // TODO: Replace it with key
-        private const val TEST = "A"
+        private const val TEST = ""//KEY
         private const val LOG_INTERVAL_SECONDS = 30 // interval between logging images
 
         // COMMANDS

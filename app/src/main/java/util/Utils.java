@@ -18,16 +18,16 @@ public class Utils {
     public static Bitmap cropFace(Bitmap src, FaceBox faceBox) {
         int centerX = (faceBox.x1 + faceBox.x2) / 2;
         int centerY = (faceBox.y1 + faceBox.y2) / 2;
-        int cropWidth = (int)((faceBox.x2 - faceBox.x1) * 1.4f);
+        int cropWidth = (int) ((faceBox.x2 - faceBox.x1) * 1.4f);
 
         int cropX1 = centerX - cropWidth / 2;
         int cropY1 = centerY - cropWidth / 2;
         int cropX2 = centerX + cropWidth / 2;
         int cropY2 = centerY + cropWidth / 2;
-        if(cropX1 < 0) cropX1 = 0;
-        if(cropX2 >= src.getWidth()) cropX2 = src.getWidth() - 1;
-        if(cropY1 < 0) cropY1 = 0;
-        if(cropY2 >= src.getHeight()) cropY2 = src.getHeight() - 1;
+        if (cropX1 < 0) cropX1 = 0;
+        if (cropX2 >= src.getWidth()) cropX2 = src.getWidth() - 1;
+        if (cropY1 < 0) cropY1 = 0;
+        if (cropY2 >= src.getHeight()) cropY2 = src.getHeight() - 1;
 
 
         int cropScaleWidth = 200;
@@ -46,7 +46,7 @@ public class Utils {
 
     public static int getOrientation(Context context, Uri photoUri) {
         Cursor cursor = context.getContentResolver().query(photoUri,
-                new String[] { MediaStore.Images.ImageColumns.ORIENTATION }, null, null, null);
+                new String[]{MediaStore.Images.ImageColumns.ORIENTATION}, null, null, null);
 
         if (cursor.getCount() != 1) {
             return -1;

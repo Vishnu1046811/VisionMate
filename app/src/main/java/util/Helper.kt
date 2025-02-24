@@ -5,7 +5,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.MediaStore
-import androidx.core.content.FileProvider
 import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
@@ -13,7 +12,12 @@ import java.util.UUID
 
 object Helper {
     fun getUriFromBitmap(image: Bitmap, context: Context): Uri? {
-        return saveBitmapToStorage(context,bitmap = image, folder = tempDirectory(context), fileName = "edited_frame_with_qr_and_date${UUID.randomUUID()}.png");
+        return saveBitmapToStorage(
+            context,
+            bitmap = image,
+            folder = tempDirectory(context),
+            fileName = "edited_frame_with_qr_and_date${UUID.randomUUID()}.png"
+        );
     }
 
     fun tempDirectory(context: Context): File {
@@ -21,7 +25,8 @@ object Helper {
     }
 
 
-    fun saveBitmapToStorage(context: Context,
+    fun saveBitmapToStorage(
+        context: Context,
         bitmap: Bitmap,
         folder: File,
         fileName: String = UUID.randomUUID().toString()
@@ -55,7 +60,7 @@ object Helper {
 
         var uri = Uri.fromFile(file)
         //return Uri.fromFile(file)
-        return convertFileUriToContentUri(context,Uri.fromFile(file))
+        return convertFileUriToContentUri(context, Uri.fromFile(file))
     }
 
 
@@ -80,7 +85,10 @@ object Helper {
         }
 
         // Insert the image into the MediaStore
-        val uri: Uri? = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+        val uri: Uri? = context.contentResolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            contentValues
+        )
 
         // If the URI is not null, write the bitmap to the output stream
         uri?.let {

@@ -49,7 +49,7 @@ class Detector(
 
     var distance: Float = 1.0f
 
-    private val imageProcessor = ImageProcessor.Builder()
+    private var imageProcessor = ImageProcessor.Builder()
         .add(NormalizeOp(INPUT_MEAN, INPUT_STANDARD_DEVIATION))
         .add(CastOp(INPUT_IMAGE_TYPE))
         .build()
@@ -90,14 +90,18 @@ class Detector(
     fun clear() {
         interpreter?.close()
         interpreter = null
+        imageProcessor = null
     }
 
     fun detect(frame: Bitmap) {
+
+        try{
         interpreter ?: return
         if (tensorWidth == 0) return
         if (tensorHeight == 0) return
         if (numChannel == 0) return
         if (numElements == 0) return
+        if(isDestroyed()) return
 
         var inferenceTime = SystemClock.uptimeMillis()
 
@@ -109,20 +113,22 @@ class Detector(
         val imageBuffer = processedImage.buffer
 
         val output = TensorBuffer.createFixedSize(intArrayOf(1 , numChannel, numElements), OUTPUT_IMAGE_TYPE)
+        if(isDestroyed()) return
         interpreter?.run(imageBuffer, output.buffer)
-
 
         val bestBoxes = bestBox(output.floatArray) {
 
 
             (context as MainActivity).detectUser(frame) { isDetected, faceModel ->
+                if(isDestroyed())
+                    return@detectUser
+
                 if (!isDetected) {
                     //(context as MainActivity).saveUserImage(frame)
                 } else {
-                    (context as Activity).runOnUiThread(){
-                        val builder = AlertDialog.Builder(context).setTitle(faceModel.identified_name).show()
-
-                        Toast.makeText(context,"Detected "+faceModel.identified_name,Toast.LENGTH_SHORT).show()
+                    (context as Activity).runOnUiThread() {
+                        //val builder = AlertDialog.Builder(context).setTitle(faceModel.identified_name).show()
+                        TextToSpeechManager.speakOut("${faceModel.identified_name} is  approaching")
 
                     }
                 }
@@ -135,20 +141,26 @@ class Detector(
             detectorListener.onEmptyDetect()
             return
         }
-
+            if(isDestroyed()) return
         //imgData is input to our model
         val inputArray = arrayOf<Any>(imageBuffer)
         val outputMap: Map<Int, Any> = HashMap()
         embeedings = Array<FloatArray>(1) { FloatArray(OUTPUT_SIZE) }
         interpreter?.runForMultipleInputsOutputs(inputArray, outputMap) //Run model
 
+        if(isDestroyed()) return
         detectorListener.onDetect(bestBoxes, inferenceTime)
+
+            }catch (e: Exception){
+                e.printStackTrace()
+            }
     }
 
     private fun bestBox(array: FloatArray, completion: () -> Unit) : List<BoundingBox>? {
 
         val boundingBoxes = mutableListOf<BoundingBox>()
 
+        try{
         for (c in 0 until numElements) {
             var maxConf = -1.0f
             var maxIdx = -1
@@ -202,6 +214,9 @@ class Detector(
                 }
             }
         }
+            }catch (e: Exception){
+                e.printStackTrace()
+            }
 
         if (boundingBoxes.isEmpty()) return null
 
@@ -342,6 +357,17 @@ class Detector(
         //        System.out.println("OUTPUT"+ Arrays.deepToString(outut));
         Toast.makeText(context, "Recognitions Loaded", Toast.LENGTH_SHORT).show()
         return retrievedMap
+    }
+
+    fun close() {
+        if (interpreter != null) {
+            interpreter?.close();
+            interpreter = null;
+        }
+    }
+
+    fun isDestroyed(): Boolean{
+        return context != null && (context as Activity).isFinishing
     }
 
 
