@@ -17,16 +17,6 @@ class SpeechClient {
     private  val PORT = 443
 
     private fun initializeSpeechClient(context: Context) {
-        /*try {
-            val credentials =
-                GoogleCredentials.fromStream(context.getResources().openRawResource(R.raw.credentials))
-            val credentialsProvider: FixedCredentialsProvider =
-                FixedCredentialsProvider.create(credentials)
-            speechClient = SpeechClient.create(
-                SpeechSettings.newBuilder().setCredentialsProvider(credentialsProvider).build()
-            )
-        } catch (e: IOException) {
-            Log.e("kya", "InitException" + e.message)
-        }*/
+
     }
 }

@@ -9,7 +9,6 @@ import org.vosk.Recognizer
 import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
 import org.vosk.android.StorageService
-import java.io.File
 import java.io.IOException
 
 class SpeechRecognizer {
@@ -18,18 +17,17 @@ class SpeechRecognizer {
     private lateinit var model: Model
 
 
-    init{
+    init {
         // Initialize Vosk Library
         LibVosk.setLogLevel(LogLevel.INFO)
 
 
-
     }
 
-    fun startListening(context: Context,recognitionListener: RecognitionListener) {
+    fun startListening(context: Context, recognitionListener: RecognitionListener) {
         StorageService.unpack(
-            context, "model-en-us",  "model",
-            StorageService.Callback<Model> { model: Model? ->
+            context, "vosk-model-small-en-in-0.4", "model",
+            { model: Model? ->
                 this.model =
                     model!!
                 //setUiState(org.vosk.demo.VoskActivity.STATE_READY)
@@ -39,30 +37,24 @@ class SpeechRecognizer {
                     speechService.startListening(recognitionListener)
                 }
             },
-            StorageService.Callback<IOException> { exception: IOException ->
-                Log.e("",
+            { exception: IOException ->
+                Log.e(
+                    "",
                     "Failed to unpack the model" + exception.message
                 )
             })
     }
 
-  /*  override fun onPartialResult(hypothesis: String?) {
-        Log.e("","")
+    fun pause() {
+        speechService.setPause(true)
     }
 
-    override fun onResult(hypothesis: String?) {
-        Log.e("","")
+    fun release() {
+        speechService.stop()
     }
 
-    override fun onFinalResult(hypothesis: String?) {
-        Log.e("","")
+    fun resume() {
+        speechService.setPause(false)
     }
 
-    override fun onError(exception: Exception?) {
-        Log.e("","")
-    }
-
-    override fun onTimeout() {
-        Log.e("","")
-    }*/
 }

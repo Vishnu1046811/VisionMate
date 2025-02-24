@@ -26,32 +26,36 @@ class ChatBotModel(context: Context) {
 
     companion object {
         private const val TAG = "ChatBotModel"
-
+        private const val apiKey = "" //API KEY
         private const val QUERY = "Here is the retrieved context\n" +
                 "--------------------------------------------------\n" +
                 "<CONTEXT>\n" +
                 "--------------------------------------------------\n" +
-                "Here is the user\\'s query: <QUERY>"
+                "Here is the user's query: <QUERY>"
     }
+
     private val chunkDb = ChunksDB()
     private val encoder = SentenceEmbeddingProvider(context)
-
+    var isProcessing = false
+        private set
 
 
     fun storeLog(text: String) {
         val embedded = encoder.encodeText(text)
-        chunkDb.addChunk(Chunk(
-            chunkData = text,
-            chunkEmbedding = embedded
-        ))
+        chunkDb.addChunk(
+            Chunk(
+                chunkData = text,
+                chunkEmbedding = embedded
+            )
+        )
         Log.i(TAG, "Logged: $text")
     }
 
     fun getAnswer(
         query: String,
-        onAnswer: (answer: String)-> Unit
+        onAnswer: (answer: String) -> Unit
     ) {
-        val apiKey = "---"
+        isProcessing = true
         val geminiRemoteAPI = GeminiRemoteAPI(apiKey)
         try {
             var jointContext = ""
@@ -66,11 +70,13 @@ class ChatBotModel(context: Context) {
                 geminiRemoteAPI.getResponse(inputPrompt)?.let { llmResponse ->
                     withContext(Dispatchers.Main) {
                         onAnswer(llmResponse)
+
                     }
                 }
+                isProcessing = false
             }
         } catch (e: Exception) {
-
+            isProcessing = false
             throw e
         }
     }
